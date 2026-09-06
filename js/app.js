@@ -1,44 +1,21 @@
 (() => {
-  const MIN_WORDS = 40;
-  const SUBMIT_PASSWORD = "1905";
+  const MIN_CHARS = 300;
   const DRAFT_STORAGE_KEY = "wp_draft";
 
-  const browseScreen = document.getElementById("browseScreen");
-  const surpriseBtn = document.getElementById("surpriseBtn");
-  const customBtn = document.getElementById("customBtn");
-  const filterRow = document.getElementById("filterRow");
-  const setGrid = document.getElementById("setGrid");
-
   const practiceScreen = document.getElementById("practiceScreen");
-  const backToBrowseBtn = document.getElementById("backToBrowseBtn");
-  const practiceTitle = document.getElementById("practiceTitle");
-  const practicePrompt = document.getElementById("practicePrompt");
-  const wordBankBlock = document.getElementById("wordBankBlock");
-  const wordBank = document.getElementById("wordBank");
+  const resultsScreen = document.getElementById("resultsScreen");
+  const resultsHeading = document.getElementById("results-heading");
+
   const timerChip = document.getElementById("timerChip");
   const wordCountChip = document.getElementById("wordCountChip");
-  const bankUsageChip = document.getElementById("bankUsageChip");
-  const startWritingBtn = document.getElementById("startWritingBtn");
+  const claimInput = document.getElementById("claimInput");
+  const audienceInput = document.getElementById("audienceInput");
   const writingForm = document.getElementById("writingForm");
   const writingInput = document.getElementById("writingInput");
   const charCounter = document.getElementById("charCounter");
-  const submitPassword = document.getElementById("submitPassword");
   const submitBtn = document.getElementById("submitBtn");
   const formError = document.getElementById("formError");
-
-  const resultsScreen = document.getElementById("resultsScreen");
-  const resultTime = document.getElementById("resultTime");
-  const resultWordCount = document.getElementById("resultWordCount");
-  const resultUsageStat = document.getElementById("resultUsageStat");
-  const resultUsage = document.getElementById("resultUsage");
-  const resultIssues = document.getElementById("resultIssues");
-  const encouragementBox = document.getElementById("encouragementBox");
-  const flowReport = document.getElementById("flowReport");
-  const highlightedText = document.getElementById("highlightedText");
-  const suggestions = document.getElementById("suggestions");
-  const videoSuggestions = document.getElementById("videoSuggestions");
-  const resultsHeading = document.getElementById("results-heading");
-  const retrySetBtn = document.getElementById("retrySetBtn");
+  const reviewCard = document.getElementById("reviewCard");
   const anotherSetBtn = document.getElementById("anotherSetBtn");
 
   const settingsToggle = document.getElementById("settingsToggle");
@@ -48,27 +25,32 @@
   const saveGeminiKeyBtn = document.getElementById("saveGeminiKeyBtn");
   const clearGeminiKeyBtn = document.getElementById("clearGeminiKeyBtn");
 
-  let currentFilter = "all";
-  let selectedSet = null;
   let sessionStartTime = null;
   let timerInterval = null;
-  let wordChipElements = [];
 
-  // Safety net so an in-progress draft survives an accidental page refresh
-  // (e.g. while recovering from a wrong submit-password attempt) — restored
-  // automatically when the same set is reopened, cleared once a submission
-  // actually succeeds or the user explicitly chooses to leave the set.
-  function saveDraft(setId, text) {
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ setId, text }));
+  function saveDraft() {
+    localStorage.setItem(
+      DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        claim: claimInput.value,
+        audience: audienceInput.value,
+        text: writingInput.value,
+      })
+    );
   }
 
-  function loadDraftText(setId) {
+  function restoreDraft() {
     try {
       const saved = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || "null");
-      const hasMatchingText = saved && saved.setId === setId && typeof saved.text === "string" && saved.text.trim();
-      return hasMatchingText ? saved.text : null;
+      if (!saved) return;
+      if (typeof saved.claim === "string") claimInput.value = saved.claim;
+      if (typeof saved.audience === "string") audienceInput.value = saved.audience;
+      if (typeof saved.text === "string" && saved.text.trim()) {
+        writingInput.value = saved.text;
+        handleWritingInput();
+      }
     } catch {
-      return null;
+      // 草稿损坏就忽略，重新开始。
     }
   }
 
@@ -81,311 +63,154 @@
   }
 
   function updateTimerChip() {
-    timerChip.textContent = `Time: ${window.WP.formatTime(elapsedSeconds())}`;
+    timerChip.textContent = `用时：${window.WP.formatTime(elapsedSeconds())}`;
+  }
+
+  function startTimerIfNeeded() {
+    if (sessionStartTime !== null) return;
+    sessionStartTime = Date.now();
+    timerInterval = setInterval(updateTimerChip, 1000);
+    updateTimerChip();
+  }
+
+  function stopTimer() {
+    clearInterval(timerInterval);
+    timerInterval = null;
   }
 
   function showScreen(screen) {
-    [browseScreen, practiceScreen, resultsScreen].forEach((section) => {
-      section.hidden = section !== screen;
-    });
-    screen.classList.remove("screen-enter");
-    // Re-triggers the CSS entrance animation every time a screen appears.
-    requestAnimationFrame(() => screen.classList.add("screen-enter"));
-  }
-
-  function renderFilterChips() {
-    filterRow.textContent = "";
-
-    const allChip = document.createElement("button");
-    allChip.type = "button";
-    allChip.className = "filter-chip";
-    allChip.textContent = "All Sets";
-    allChip.dataset.category = "all";
-    filterRow.appendChild(allChip);
-
-    Object.entries(CATEGORY_META).forEach(([key, meta]) => {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "filter-chip";
-      chip.textContent = meta.label;
-      chip.dataset.category = key;
-      chip.style.setProperty("--accent", meta.color);
-      filterRow.appendChild(chip);
-    });
-
-    syncFilterChipState();
-  }
-
-  function syncFilterChipState() {
-    filterRow.querySelectorAll(".filter-chip").forEach((chip) => {
-      const isActive = chip.dataset.category === currentFilter;
-      chip.classList.toggle("is-active", isActive);
-      chip.setAttribute("aria-pressed", String(isActive));
-    });
-  }
-
-  function renderSetGrid() {
-    setGrid.textContent = "";
-    const visibleSets = PRACTICE_SETS.filter(
-      (set) => currentFilter === "all" || set.category === currentFilter
-    );
-
-    visibleSets.forEach((set) => {
-      const meta = CATEGORY_META[set.category];
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "set-card";
-      card.dataset.setId = String(set.id);
-      card.style.setProperty("--accent", meta.color);
-
-      const tag = document.createElement("span");
-      tag.className = "card-tag";
-      tag.textContent = meta.label;
-
-      const title = document.createElement("h3");
-      title.className = "card-title";
-      title.textContent = set.title;
-
-      const promptPreview = document.createElement("p");
-      promptPreview.className = "card-prompt";
-      promptPreview.textContent = set.prompt;
-
-      const words = document.createElement("p");
-      words.className = "card-words";
-      const preview = set.words.slice(0, 4).join(", ");
-      const remaining = set.words.length - 4;
-      words.textContent = remaining > 0 ? `${preview} +${remaining} more` : preview;
-
-      card.appendChild(tag);
-      card.appendChild(title);
-      card.appendChild(promptPreview);
-      card.appendChild(words);
-      setGrid.appendChild(card);
-    });
-  }
-
-  function resetPracticeForm() {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    sessionStartTime = null;
-
-    writingForm.hidden = true;
-    startWritingBtn.hidden = false;
-    writingInput.value = "";
-    writingInput.disabled = true;
-    submitPassword.value = "";
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Submit for Feedback";
-    charCounter.textContent = "0 characters";
-    wordCountChip.textContent = "Words: 0";
-    timerChip.textContent = "Time: 0:00";
-    bankUsageChip.hidden = selectedSet.words.length === 0;
-    bankUsageChip.textContent = `Bank words: 0/${selectedSet.words.length}`;
-    wordChipElements.forEach((chip) => chip.classList.remove("is-used"));
-    formError.hidden = true;
-    formError.textContent = "";
-  }
-
-  function openPracticeScreen(set) {
-    selectedSet = set;
-    practiceTitle.textContent = set.title;
-    practicePrompt.textContent = set.prompt;
-
-    wordBankBlock.hidden = set.words.length === 0;
-    wordBank.textContent = "";
-    wordChipElements = set.words.map((word) => {
-      const chip = document.createElement("span");
-      chip.className = "word-chip";
-      chip.textContent = word;
-      wordBank.appendChild(chip);
-      return chip;
-    });
-
-    resetPracticeForm();
-    showScreen(practiceScreen);
-
-    const draftText = loadDraftText(set.id);
-    if (draftText) {
-      startWriting();
-      writingInput.value = draftText;
-      handleWritingInput();
-    } else {
-      startWritingBtn.focus();
-    }
-  }
-
-  function startWriting() {
-    sessionStartTime = Date.now();
-    clearInterval(timerInterval);
-    timerInterval = setInterval(updateTimerChip, 1000);
-    updateTimerChip();
-
-    startWritingBtn.hidden = true;
-    writingForm.hidden = false;
-    writingInput.disabled = false;
-    writingInput.focus();
+    practiceScreen.hidden = screen !== practiceScreen;
+    resultsScreen.hidden = screen !== resultsScreen;
   }
 
   function handleWritingInput() {
     const text = writingInput.value;
-    wordCountChip.textContent = `Words: ${window.WP.countWords(text)}`;
-    charCounter.textContent = `${text.length} character${text.length === 1 ? "" : "s"}`;
-    submitBtn.disabled = window.WP.countWords(text) < MIN_WORDS;
-    updateBankUsage(text);
-    saveDraft(selectedSet.id, text);
+    const count = window.WP.countChineseChars(text);
+    wordCountChip.textContent = `字数：${count}`;
+    charCounter.textContent = `${count} 字`;
+    submitBtn.disabled = count < MIN_CHARS;
+    if (count > 0) startTimerIfNeeded();
     if (!formError.hidden) {
       formError.hidden = true;
       formError.textContent = "";
     }
   }
 
-  function updateBankUsage(text) {
-    if (selectedSet.words.length === 0) return;
-    const usedWords = new Set(window.WP.usedBankWords(selectedSet.words, text));
-    bankUsageChip.textContent = `Bank words: ${usedWords.size}/${selectedSet.words.length}`;
-    wordChipElements.forEach((chip, index) => {
-      chip.classList.toggle("is-used", usedWords.has(selectedSet.words[index]));
-    });
+  function renderReview(review) {
+    reviewCard.textContent = "";
+
+    if (!review.hasIssue) {
+      const praise = document.createElement("div");
+      praise.className = "review-praise";
+      praise.textContent = review.why || "结构完整，今天写得清楚。";
+      reviewCard.appendChild(praise);
+      return;
+    }
+
+    const quote = document.createElement("blockquote");
+    quote.className = "review-quote";
+    quote.textContent = review.quote || "（没有摘出原文）";
+
+    const problem = document.createElement("p");
+    problem.className = "review-line";
+    problem.textContent = `问题：${review.problem || ""}`;
+
+    const fix = document.createElement("p");
+    fix.className = "review-line";
+    fix.textContent = `改法：${review.fix || ""}`;
+
+    const why = document.createElement("p");
+    why.className = "review-line review-why";
+    why.textContent = `为什么：${review.why || ""}`;
+
+    reviewCard.appendChild(quote);
+    reviewCard.appendChild(problem);
+    reviewCard.appendChild(fix);
+    reviewCard.appendChild(why);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!claimInput.value.trim()) {
+      showError("先写主张：我要说的那一句是什么？");
+      claimInput.focus();
+      return;
+    }
+    if (!audienceInput.value.trim()) {
+      showError("先写对象：对谁说？");
+      audienceInput.focus();
+      return;
+    }
+
     const text = writingInput.value.trim();
-    const wordCount = window.WP.countWords(text);
-
-    if (wordCount < MIN_WORDS) {
-      formError.hidden = false;
-      formError.textContent = `Write at least ${MIN_WORDS} words before submitting — you're at ${wordCount}.`;
+    const count = window.WP.countChineseChars(text);
+    if (count < MIN_CHARS) {
+      showError(`还差 ${MIN_CHARS - count} 字。`);
       return;
     }
 
-    if (submitPassword.value !== SUBMIT_PASSWORD) {
-      formError.hidden = false;
-      formError.textContent = "Incorrect submit password.";
-      submitPassword.value = "";
-      submitPassword.focus();
+    if (!window.WP.hasGeminiKey()) {
+      showError("还没配置 API Key——点上面的「设置」粘贴 Gemini API Key。");
       return;
     }
 
-    const finishedAt = elapsedSeconds();
-    clearInterval(timerInterval);
-    timerInterval = null;
-
-    const usingGemini = window.WP.hasGeminiKey();
-
-    writingInput.disabled = true;
-    submitPassword.disabled = true;
+    stopTimer();
     submitBtn.disabled = true;
-    submitBtn.textContent = usingGemini ? "Checking with Gemini…" : "Checking your writing…";
+    submitBtn.textContent = "批改中……";
     formError.hidden = true;
 
     try {
-      const matches = usingGemini
-        ? await window.WP.checkTextWithGemini(text)
-        : [...(await window.WP.checkText(text)), ...window.WP.runHeuristicRules(text)];
-      const wordsUsedCount = window.WP.countWordsUsedFromBank(selectedSet.words, text);
+      const review = await window.WP.checkTextWithGemini(claimInput.value.trim(), audienceInput.value.trim(), text);
       clearDraft();
-      showResults({
-        set: selectedSet,
-        text,
-        matches,
-        wordCount,
-        wordsUsedCount,
-        elapsedSeconds: finishedAt,
-      });
+      renderReview(review);
+      showScreen(resultsScreen);
+      resultsHeading.focus();
     } catch (error) {
-      formError.hidden = false;
-      formError.textContent = usingGemini
-        ? `Couldn't get a response from Gemini (${error.message}). Check your API key in Settings, or clear it to use the free checker.`
-        : "Couldn't reach the grammar checker — check your connection and try submitting again.";
-      writingInput.disabled = false;
-      submitPassword.disabled = false;
+      showError(error.message || "批改失败，稍后再试。");
+      submitBtn.textContent = "提交批改";
       submitBtn.disabled = false;
-      submitBtn.textContent = "Submit for Feedback";
-      timerInterval = setInterval(updateTimerChip, 1000);
+      startTimerIfNeeded();
     }
   }
 
-  function showResults({ set, text, matches, wordCount, wordsUsedCount, elapsedSeconds: seconds }) {
-    resultTime.textContent = window.WP.formatTime(seconds);
-    resultWordCount.textContent = String(wordCount);
-    resultUsageStat.hidden = set.words.length === 0;
-    resultUsage.textContent = `${wordsUsedCount}/${set.words.length}`;
-    resultIssues.textContent = String(matches.length);
-
-    const encouragement = window.WP.buildEncouragement({
-      wordCount,
-      issueCount: matches.length,
-      wordsUsedCount,
-      totalWords: set.words.length,
-      elapsedSeconds: seconds,
-    });
-    window.WP.renderEncouragement(encouragementBox, encouragement);
-
-    window.WP.renderFlowReport(flowReport, window.WP.analyzeFlow(text));
-
-    window.WP.renderHighlightedText(highlightedText, text, matches);
-    window.WP.renderSuggestions(suggestions, text, matches);
-    window.WP.loadVideoSuggestions(videoSuggestions, matches);
-
-    showScreen(resultsScreen);
-    resultsHeading.focus();
+  function showError(message) {
+    formError.hidden = false;
+    formError.textContent = message;
   }
 
-  function hasUnsavedWriting() {
-    return !writingForm.hidden && writingInput.value.trim().length > 0;
-  }
-
-  function backToBrowse() {
-    if (hasUnsavedWriting() && !window.confirm("Leave this set? Your unsaved writing will be lost.")) {
-      return;
-    }
+  function startNewPiece() {
     clearDraft();
-    clearInterval(timerInterval);
-    timerInterval = null;
-    showScreen(browseScreen);
+    stopTimer();
+    sessionStartTime = null;
+    writingInput.value = "";
+    writingInput.disabled = false;
+    submitBtn.textContent = "提交批改";
+    handleWritingInput();
+    showScreen(practiceScreen);
+    claimInput.focus();
   }
 
   function syncSettingsStatus() {
     settingsStatus.textContent = window.WP.hasGeminiKey()
-      ? "Currently checking with: Gemini (AI review)."
-      : "Currently checking with: the free checker (LanguageTool + built-in rules).";
+      ? "已配置 Gemini API Key，可以批改。"
+      : "还没配置 API Key——去 https://aistudio.google.com/apikey 申请一个，粘贴进来。";
   }
 
-  renderFilterChips();
-  renderSetGrid();
+  // 初始化
+  restoreDraft();
   syncSettingsStatus();
+  showScreen(practiceScreen);
+  if (!claimInput.value && !audienceInput.value) claimInput.focus();
 
-  surpriseBtn.addEventListener("click", () => {
-    const pool =
-      currentFilter === "all" ? PRACTICE_SETS : PRACTICE_SETS.filter((set) => set.category === currentFilter);
-    const randomSet = pool[Math.floor(Math.random() * pool.length)];
-    openPracticeScreen(randomSet);
+  writingInput.addEventListener("input", () => {
+    handleWritingInput();
+    saveDraft();
   });
-
-  customBtn.addEventListener("click", () => openPracticeScreen(CUSTOM_SET));
-
-  filterRow.addEventListener("click", (event) => {
-    const chip = event.target.closest(".filter-chip");
-    if (!chip) return;
-    currentFilter = chip.dataset.category;
-    syncFilterChipState();
-    renderSetGrid();
-  });
-
-  setGrid.addEventListener("click", (event) => {
-    const card = event.target.closest(".set-card");
-    if (!card) return;
-    const set = PRACTICE_SETS.find((item) => item.id === Number(card.dataset.setId));
-    if (set) openPracticeScreen(set);
-  });
-
-  backToBrowseBtn.addEventListener("click", backToBrowse);
-  startWritingBtn.addEventListener("click", startWriting);
-  writingInput.addEventListener("input", handleWritingInput);
+  claimInput.addEventListener("input", saveDraft);
+  audienceInput.addEventListener("input", saveDraft);
   writingForm.addEventListener("submit", handleSubmit);
-  retrySetBtn.addEventListener("click", () => openPracticeScreen(selectedSet));
-  anotherSetBtn.addEventListener("click", () => showScreen(browseScreen));
+  anotherSetBtn.addEventListener("click", startNewPiece);
 
   settingsToggle.addEventListener("click", () => {
     const isOpen = !settingsPanel.hidden;
