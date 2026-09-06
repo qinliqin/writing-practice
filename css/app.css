@@ -27,6 +27,21 @@
   color: var(--color-muted);
 }
 
+.structure-label {
+  margin-top: 0.6rem;
+}
+
+.structure-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-ink);
+}
+
 .anchor-input {
   font-family: var(--font-body);
   font-size: 1rem;

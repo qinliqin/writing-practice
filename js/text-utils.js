@@ -16,7 +16,7 @@
   // focus：error 提示时该聚焦哪个输入框（"claim"/"audience"/null）。
   function validateSubmission(claim, audience, count, hasKey) {
     if (!claim.trim()) {
-      return { ok: false, error: "先写主张：我要说的那一句是什么？", focus: "claim" };
+      return { ok: false, error: "先写一句话概括：把今天要说的浓缩成一句。", focus: "claim" };
     }
     if (!audience.trim()) {
       return { ok: false, error: "先写对象：对谁说？", focus: "audience" };

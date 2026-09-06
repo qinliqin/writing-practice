@@ -34,12 +34,12 @@ test("空字符串计 0", () => {
 });
 
 // ---------- B. 提交校验 ----------
-test("空主张拦截", () => {
+test("空一句话概括拦截", () => {
   const r = utils.validateSubmission("", "另一个我", 300, true);
   assert.strictEqual(r.ok, false);
-  assert.ok(r.error.includes("主张"));
+  assert.ok(r.error.includes("一句话概括"));
 });
-test("空白主张也拦截", () => {
+test("空白一句话概括也拦截", () => {
   const r = utils.validateSubmission("   ", "另一个我", 300, true);
   assert.strictEqual(r.ok, false);
 });

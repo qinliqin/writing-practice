@@ -8,6 +8,7 @@
   const wordCountChip = document.getElementById("wordCountChip");
   const claimInput = document.getElementById("claimInput");
   const audienceInput = document.getElementById("audienceInput");
+  const structureClaim = document.getElementById("structureClaim");
   const writingForm = document.getElementById("writingForm");
   const writingInput = document.getElementById("writingInput");
   const charCounter = document.getElementById("charCounter");
@@ -37,7 +38,10 @@
   function restoreDraft() {
     const saved = window.WP.loadDraft(localStorage);
     if (!saved) return;
-    if (typeof saved.claim === "string") claimInput.value = saved.claim;
+    if (typeof saved.claim === "string") {
+      claimInput.value = saved.claim;
+      structureClaim.textContent = saved.claim || "（上面填了自动显示）";
+    }
     if (typeof saved.audience === "string") audienceInput.value = saved.audience;
     if (typeof saved.text === "string" && saved.text.trim()) {
       writingInput.value = saved.text;
@@ -190,7 +194,10 @@
     handleWritingInput();
     saveDraft();
   });
-  claimInput.addEventListener("input", saveDraft);
+  claimInput.addEventListener("input", () => {
+    structureClaim.textContent = claimInput.value.trim() || "（上面填了自动显示）";
+    saveDraft();
+  });
   audienceInput.addEventListener("input", saveDraft);
   writingForm.addEventListener("submit", handleSubmit);
   anotherSetBtn.addEventListener("click", startNewPiece);
