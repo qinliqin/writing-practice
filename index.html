@@ -19,20 +19,20 @@
   <div class="settings-panel" id="settingsPanel" hidden>
     <p class="settings-status" id="settingsStatus">正在检查状态……</p>
 
-    <label for="geminiKeyInput">Gemini API Key（密钥 /ˈkiː/）</label>
+    <label for="apiKeyInput">DeepSeek API Key（密钥 /ˈkiː/）</label>
     <div class="settings-row">
       <input
         type="password"
-        id="geminiKeyInput"
+        id="apiKeyInput"
         autocomplete="off"
         placeholder="在这里粘贴密钥"
       />
-      <button type="button" class="secondary-btn" id="saveGeminiKeyBtn">保存</button>
-      <button type="button" class="back-link" id="clearGeminiKeyBtn">清除已保存的密钥</button>
+      <button type="button" class="secondary-btn" id="saveApiKeyBtn">保存</button>
+      <button type="button" class="back-link" id="clearApiKeyBtn">清除已保存的密钥</button>
     </div>
 
     <p class="settings-note">
-      密钥只存在您浏览器的本地存储里，不会写到任何文件，也不会发给除 Gemini 之外的任何地方。
+      密钥只存在您浏览器的本地存储里，不会写到任何文件，也不会发给除 DeepSeek 之外的任何地方。
       没有密钥时无法批改，只能保存写作记录。
     </p>
   </div>
@@ -82,7 +82,8 @@
   </footer>
 
   <script src="js/text-utils.js"></script>
-  <script src="js/gemini.js"></script>
+  <script src="js/draft.js"></script>
+  <script src="js/ai.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
