@@ -75,11 +75,20 @@ test("指令包含文章全文", () => {
 });
 test("指令要求一次一处", () => {
   const p = ai.buildPrompt("主张", "对象", "正文");
-  assert.ok(p.includes("一次只指出最要命的一处问题"));
+  assert.ok(p.includes("一次只指出一处问题"));
 });
 test("指令要求只输出 JSON", () => {
   const p = ai.buildPrompt("主张", "对象", "正文");
   assert.ok(p.includes("只输出 JSON"));
+});
+test("指令限定只批结构：五个问题类型+禁止批内容", () => {
+  const p = ai.buildPrompt("一句话概括", "对象", "正文");
+  assert.ok(p.includes("缺一句话概括"));
+  assert.ok(p.includes("缺理由"));
+  assert.ok(p.includes("缺例子"));
+  assert.ok(p.includes("缺结论"));
+  assert.ok(p.includes("顺序乱"));
+  assert.ok(p.includes("不要批内容"));
 });
 
 // ---------- D. AI 返回清洗 ----------
